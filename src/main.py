@@ -29,10 +29,13 @@ m4 = ['000100',
       '000010',
       '111010']
 
-m = Matrix(m4)
+m = Matrix(m2)
+print 'Matrice originale'
 print str(m)
-print m.preprocessing()
-# print str(m)
+s, e, ma = m.preprocessing()
+print str(generate_expression(s, e, ma))
+print 'Matrice residua'
+print str(m)
 
 # mhs = m.compute_mhs()
 # print mhs
