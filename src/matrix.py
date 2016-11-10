@@ -35,9 +35,11 @@ class Matrix:
         for i in range(len(self.rows[0])):
             for row in self.rows:
                 try:
-                    self.cols['c' + str(i + 1)].append(Bitset(row[i]))
+                    # self.cols['c' + str(i + 1)].append(Bitset(row[i]))
+                    self.cols[str(i + 1)].append(Bitset(row[i]))
                 except KeyError:
-                    self.cols['c' + str(i + 1)] = Bitset([row[i]])
+                    # self.cols['c' + str(i + 1)].append(Bitset(row[i]))
+                    self.cols[str(i + 1)] = Bitset([row[i]])
         self.counter1_col = OrderedDict()
         for col_id, col in self.cols.iteritems():
             self.counter1_col[col_id] = int(col.count())
@@ -109,7 +111,7 @@ class Matrix:
         for col_id, col in self.cols.iteritems():
             self.counter1_col[col_id] = int(col.count())
 
-    def submatrix(self, removed_rows=[], removed_cols=[]):
+    def submatrix(self, removed_rows=None, removed_cols=None):
 
         """
         Rimuove dalla matrice le righe e le colonne specificate.

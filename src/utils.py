@@ -1,4 +1,3 @@
-# import os
 from copy import deepcopy
 from expression import *
 
@@ -72,7 +71,7 @@ def max_cols1(counter1):
             col_ids.append(col_id)
     return col_ids
 
-def compute_mhs(matrix, removed_col=None, removed_rows=[], i=0):
+def compute_mhs(matrix, removed_col=None, removed_rows=None, i=0):
 
     """
     Completa il calcolo dei MHS elaborando una colonna ad ogni iterazione.
@@ -84,18 +83,22 @@ def compute_mhs(matrix, removed_col=None, removed_rows=[], i=0):
         matrix.submatrix(removed_rows=removed_rows)
         matrix.submatrix(removed_cols=[removed_col])
     singletons, everywhere_ids, substitutions_map = matrix.preprocessing()
-    result = None
+    expr = generate_expression(singletons, everywhere_ids, substitutions_map)
+    sum_expr = SumExpression()
     while not matrix.is_empty() and not matrix.check_for_rows_without_1():
-        mhs_expr = '+'.join(singletons)
-        if everywhere_ids:
-            mhs_expr += '+' + ''.join(everywhere_ids)
         max_col_ids = matrix.max_cols1()
         if matrix.cols:
             col_id = max_col_ids.pop(0)
             hit_rows = matrix.hit_rows(col_id)
             result = compute_mhs(deepcopy(matrix), col_id, hit_rows, i+1)
             matrix.submatrix(removed_cols=[col_id])
-    return result
+            sum_expr.add_operand(ProdExpression([AtomicElem(col_id), result]))
+    if not expr:
+        return sum_expr
+    incomplete_operand = expr.get_incomplete_operand()
+    if not sum_expr.is_empty():
+        incomplete_operand.add_operand(sum_expr)
+    return expr
 
 def generate_expression(singletons, everywhere_ids, substitutions_map):
 
@@ -110,7 +113,7 @@ def generate_expression(singletons, everywhere_ids, substitutions_map):
         if expr:
             prod.add_operand(expr)
         if everywhere_ids[i]:
-            prod += ProdExpression([e for e in everywhere_ids[i]])
+            prod.add_operands([e for e in everywhere_ids[i]])
         if singletons[i]:
             expr = SumExpression([s for s in singletons[i]])
             if not prod.is_empty():

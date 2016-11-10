@@ -1,4 +1,4 @@
-class Expression:
+class Expression(object):
 
     """
     Rappresenta un'espressione generica.
@@ -7,23 +7,23 @@ class Expression:
     AtomicElem).
     """
 
-    def __init__(self, operands=[]):
+    def __init__(self, operands):
 
         """
         Inizializza l'espressione con la lista degli operandi.
         """
+        if not operands:
+            self.operands = []
+        else:
+            self.operands = operands
 
-        self.operands = operands
-
-    def __radd__(self, other):
+    def add_operands(self, operands):
 
         """
-        Utilizzato per l'operatore '+=' tra espressioni.
         Concatena gli elementi di due espressioni.
         """
 
-        self.operands += other.operands
-        return self
+        self.operands += operands
 
     def add_operand(self, operand):
 
@@ -33,6 +33,14 @@ class Expression:
 
         self.operands.append(operand)
 
+    def count_operands(self, count=0):
+        for operand in self.operands:
+            if not isinstance(operand, AtomicElem):
+                count = operand.count_operands(count)
+            else:
+                count += 1
+        return count
+
     def is_empty(self):
 
         """
@@ -41,25 +49,33 @@ class Expression:
 
         return len(self.operands) == 0
 
-    def get_incomplete_element(self):
-        pass
+    def get_prod_expression(self):
+        for operand in self.operands:
+            if isinstance(operand, ProdExpression):
+                return operand
+        return None
 
-class SumExpression(Expression):
+    def get_sum_expression(self):
+        for operand in self.operands:
+            if isinstance(operand, SumExpression):
+                return operand
+        return None
 
-    """
-    Rappresenta un'espressione i cui operandi sono legati dall'operatore '+'.
-    Tale espressione e' adatta a rappresentare i singoletti, le sostituzioni in caso di colonne duplicate e per unire i
-    risultati trovati con l'eliminazione di una colonna per volta.
-    """
-
-    def __str__(self):
-
-        """
-        Crea e restituisce una rappresentazione dell'espressione in forma testuale.
-        """
-
-        return '(' + '+'.join([str(op) for op in self.operands]) + ')'
-        # return '+'.join([str(op) for op in self.operands])
+    def get_incomplete_operand(self):
+        if self.is_empty():
+            return self
+        if isinstance(self, SumExpression):
+            prod_expr = self.get_prod_expression()
+            if prod_expr:
+                return prod_expr.get_incomplete_operand()
+            else:
+                return self
+        else:
+            sum_expr = self.get_sum_expression()
+            if sum_expr:
+                return sum_expr.get_incomplete_operand()
+            else:
+                return self
 
 class ProdExpression(Expression):
 
@@ -69,20 +85,45 @@ class ProdExpression(Expression):
     per unire l'espressione temporanea con il risultato della ricorsione.
     """
 
+    def __init__(self, operands=None):
+        super(ProdExpression, self).__init__(operands)
+        # Expression.__init__(self, operands)
+
     def __str__(self):
 
         """
         Crea e restituisce una rappresentazione dell'espressione in forma testuale.
         """
 
-        return '(' + '*'.join([str(op) for op in self.operands]) + ')'
-        # result = []
-        # for i, operand in enumerate(self.operands):
-        #     if isinstance(operand, SumExpression):
-        #         result.append('(' + str(operand) + ')')
-        #     else:
-        #         result.append(str(operand))
-        # return '*'.join(result)
+        # return '(' + '*'.join([str(op) for op in self.operands]) + ')'
+        result = []
+        for i, operand in enumerate(self.operands):
+            if isinstance(operand, SumExpression) and operand.count_operands() > 1:
+                result.append('(' + str(operand) + ')')
+            else:
+                result.append(str(operand))
+        return '*'.join(result)
+
+class SumExpression(Expression):
+
+    """
+    Rappresenta un'espressione i cui operandi sono legati dall'operatore '+'.
+    Tale espressione e' adatta a rappresentare i singoletti, le sostituzioni in caso di colonne duplicate e per unire i
+    risultati trovati con l'eliminazione di una colonna per volta.
+    """
+
+    def __init__(self, operands=None):
+        super(SumExpression, self).__init__(operands)
+        # Expression.__init__(self, operands)
+
+    def __str__(self):
+
+        """
+        Crea e restituisce una rappresentazione dell'espressione in forma testuale.
+        """
+
+        # return '(' + '+'.join([str(op) for op in self.operands]) + ')'
+        return '+'.join([str(op) for op in self.operands])
 
 class AtomicElem:
 

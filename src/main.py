@@ -29,16 +29,10 @@ m4 = ['000100',
       '000010',
       '111010']
 
-m = Matrix(m2)
+m = Matrix(m4)
 print 'Matrice originale'
 print str(m)
-s, e, ma = m.preprocessing()
-print str(generate_expression(s, e, ma))
-print 'Matrice residua'
-print str(m)
-
-# mhs = m.compute_mhs()
-# print mhs
+print str(compute_mhs(m))
 
 # n = len([f for input_dir in os.listdir('input') for f in os.listdir('input/' + input_dir)])
 # for i, input_dir in enumerate(os.listdir('input')):
