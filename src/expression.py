@@ -57,7 +57,7 @@ class Expression(object):
 
     def get_sum_expression(self):
         for operand in self.operands:
-            if isinstance(operand, SumExpression):
+            if isinstance(operand, SumExpression) and not operand.get_is_everywhere_id():
                 return operand
         return None
 
@@ -76,6 +76,21 @@ class Expression(object):
                 return sum_expr.get_incomplete_operand()
             else:
                 return self
+
+    def substitute(self, substitutions_map):
+        if not substitutions_map:
+            return
+        operands = []
+        for operand in self.operands:
+            if isinstance(operand, AtomicElem):
+                new_operand = operand
+                if str(operand) in substitutions_map:
+                    new_operand = SumExpression([operand] + [AtomicElem(e) for e in substitutions_map[str(operand)]])
+            else:
+                operand.substitute(substitutions_map)
+                new_operand = operand
+            operands.append(new_operand)
+        self.operands = operands
 
 class ProdExpression(Expression):
 
@@ -114,6 +129,7 @@ class SumExpression(Expression):
 
     def __init__(self, operands=None):
         super(SumExpression, self).__init__(operands)
+        self.is_everywhere_id = False
         # Expression.__init__(self, operands)
 
     def __str__(self):
@@ -124,6 +140,12 @@ class SumExpression(Expression):
 
         # return '(' + '+'.join([str(op) for op in self.operands]) + ')'
         return '+'.join([str(op) for op in self.operands])
+
+    def get_is_everywhere_id(self):
+        return self.is_everywhere_id
+
+    def set_is_everywhere_id(self, flag=True):
+        self.is_everywhere_id = flag
 
 class AtomicElem:
 

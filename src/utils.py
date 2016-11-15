@@ -1,5 +1,6 @@
 from copy import deepcopy
 from expression import *
+import os
 
 def reverse_dict(d):
 
@@ -71,7 +72,7 @@ def max_cols1(counter1):
             col_ids.append(col_id)
     return col_ids
 
-def compute_mhs(matrix, removed_col=None, removed_rows=None, i=0):
+def compute_mhs(matrix, removed_col=None, removed_rows=None):
 
     """
     Completa il calcolo dei MHS elaborando una colonna ad ogni iterazione.
@@ -87,12 +88,14 @@ def compute_mhs(matrix, removed_col=None, removed_rows=None, i=0):
     sum_expr = SumExpression()
     while not matrix.is_empty() and not matrix.check_for_rows_without_1():
         max_col_ids = matrix.max_cols1()
+        # max_col_ids = deepcopy(matrix.cols.keys())
         if matrix.cols:
             col_id = max_col_ids.pop(0)
             hit_rows = matrix.hit_rows(col_id)
-            result = compute_mhs(deepcopy(matrix), col_id, hit_rows, i+1)
+            result = compute_mhs(deepcopy(matrix), col_id, hit_rows)
             matrix.submatrix(removed_cols=[col_id])
             sum_expr.add_operand(ProdExpression([AtomicElem(col_id), result]))
+    sum_expr.substitute(substitutions_map)
     if not expr:
         return sum_expr
     incomplete_operand = expr.get_incomplete_operand()
@@ -131,6 +134,10 @@ def substitute(singletons, everywhere_ids, substitutions_map):
 
     s = do_substitution(singletons, substitutions_map)
     e = do_substitution(everywhere_ids, substitutions_map)
+    for operands_list in e:
+        for operand in operands_list:
+            if isinstance(operand, SumExpression):
+                operand.set_is_everywhere_id()
     return s, e
 
 def do_substitution(elems, substitutions_map):
@@ -153,12 +160,12 @@ def do_substitution(elems, substitutions_map):
         s.append(ss)
     return s
 
-# def create_dir(dirname):
-#     if not os.path.exists(dirname):
-#         os.makedirs(dirname)
-#     return dirname + '/'
+def create_dir(dirname):
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    return dirname + '/'
 
-# def show_progress(fname, partial, total):
-#     progress = int(round(100 * float(partial) / total))
-#     os.system('cls')
-#     print fname + ': progress: ' + str(progress) + '% (' + str(partial) + '/' + str(total) + ')'
+def show_progress(fname, partial, total):
+    progress = int(round(100 * float(partial) / total))
+    os.system('cls')
+    print fname + ': progress: ' + str(progress) + '% (' + str(partial) + '/' + str(total) + ')'

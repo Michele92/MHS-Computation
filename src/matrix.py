@@ -123,6 +123,7 @@ class Matrix:
             for i, row in enumerate(self.rows):
                 if i not in removed_rows:
                     rows.add(row)
+
             self.rows = rows
             self.update_cols()
         if self.cols:
@@ -134,9 +135,11 @@ class Matrix:
                     #     self.counter1_col.pop(col_id)
                 self.cols = cols
                 self.update_rows()
+                self.update_cols()
                 self.update_counter1()
         else:
             self.counter1_col = OrderedDict()
+
 
     def max_cols1(self):
 
