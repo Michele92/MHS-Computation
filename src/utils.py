@@ -1,6 +1,10 @@
-from copy import deepcopy
-from expression import *
 import os
+from copy import deepcopy
+
+import sympy
+
+from expression import *
+
 
 def reverse_dict(d):
 
@@ -85,6 +89,44 @@ def compute_mhs(matrix, removed_col=None, removed_rows=None):
         matrix.submatrix(removed_cols=[removed_col])
     singletons, everywhere_ids, substitutions_map = matrix.preprocessing()
     expr = generate_expression(singletons, everywhere_ids, substitutions_map)
+    if matrix.is_empty():
+        return expr
+    submatrices = matrix.partition()
+    partitionable = True
+    if not submatrices:
+        submatrices = [matrix]
+        partitionable = False
+    prod_expr = ProdExpression()
+    sum_expr = SumExpression()
+    for submatrix in submatrices:
+        if partitionable:
+            result = sub_compute_mhs(submatrix)
+            if result:
+                result.substitute(substitutions_map)
+                prod_expr.add_operand(result)
+        else:
+            while not submatrix.is_empty() and not submatrix.check_for_rows_without_1():
+                max_col_ids = submatrix.max_cols1()
+                # max_col_ids = deepcopy(matrix.cols.keys())
+                if submatrix.cols:
+                    col_id = max_col_ids.pop(0)
+                    hit_rows = submatrix.hit_rows(col_id)
+                    result = compute_mhs(deepcopy(submatrix), col_id, hit_rows)
+                    submatrix.submatrix(removed_cols=[col_id])
+                    sum_expr.add_operand(ProdExpression([AtomicElem(col_id), result]))
+            sum_expr.substitute(substitutions_map)
+    result = sum_expr
+    if partitionable:
+        result = prod_expr
+    if not expr:
+        return result
+    incomplete_operand = expr.get_incomplete_operand()
+    incomplete_operand.add_operand(result)
+    return expr
+
+def sub_compute_mhs(matrix):
+    singletons, everywhere_ids, substitutions_map = matrix.preprocessing()
+    expr = generate_expression(singletons, everywhere_ids, substitutions_map)
     sum_expr = SumExpression()
     while not matrix.is_empty() and not matrix.check_for_rows_without_1():
         max_col_ids = matrix.max_cols1()
@@ -102,6 +144,7 @@ def compute_mhs(matrix, removed_col=None, removed_rows=None):
     if not sum_expr.is_empty():
         incomplete_operand.add_operand(sum_expr)
     return expr
+
 
 def generate_expression(singletons, everywhere_ids, substitutions_map):
 
@@ -159,6 +202,27 @@ def do_substitution(elems, substitutions_map):
                     ss.append(tmp[0])
         s.append(ss)
     return s
+
+def prune(expr):
+    flatten_expr = str(sympy.expand(expr.to_string('c'))).replace(' ', '')
+    hss = flatten_expr.split('+')
+    hss = map(lambda hs: hs.split('*'), sorted(hss, key=len, reverse=True))
+    mhss = []
+    for i, hs in enumerate(hss):
+        mhss.append(hs)
+        for j in range(i + 1, len(hss)):
+            l = len(hss[j])
+            if l < len(hs):
+                for elem in hs:
+                    if elem in hss[j]:
+                        l -= 1
+                    if l == 0:
+                        mhss.remove(hs)
+                        break
+                if l == 0:
+                    break
+    print len(mhss)
+    # expr = '+'.join(map(lambda mhs: '*'.join(mhs), mhss))
 
 def create_dir(dirname):
     if not os.path.exists(dirname):

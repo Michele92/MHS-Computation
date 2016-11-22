@@ -22,27 +22,24 @@ class Matrix:
         > un dizionario che mappa gli id delle colonne con il numero di 1 contenuti nelle stesse (euristica)
     """
 
-    def __init__(self, rows):
+    def __init__(self, rows=None, col_ids=None):
 
         """
         Inizializza la matrice a partire da una lista di stringhe che rappresentano le righe.
         """
 
         self.rows = OrderedSet()
-        for row in rows:
-            self.rows.add(Bitset(row))
         self.cols = OrderedDict()
-        for i in range(len(self.rows[0])):
-            for row in self.rows:
-                try:
-                    # self.cols['c' + str(i + 1)].append(Bitset(row[i]))
-                    self.cols[str(i + 1)].append(Bitset(row[i]))
-                except KeyError:
-                    # self.cols['c' + str(i + 1)].append(Bitset(row[i]))
-                    self.cols[str(i + 1)] = Bitset([row[i]])
         self.counter1_col = OrderedDict()
-        for col_id, col in self.cols.iteritems():
-            self.counter1_col[col_id] = int(col.count())
+        if rows:
+            for row in rows:
+                self.rows.add(Bitset(row))
+            self.create_cols(col_ids)
+            self.update_counter1_col()
+            # self.update_counter1_row()
+        else:
+            for col_id in col_ids:
+                self.cols[col_id] = None
 
     def __str__(self):
 
@@ -58,6 +55,21 @@ class Matrix:
         for row in self.rows:
             s += ' '.join(['%5s' % bit for bit in row.to01()]) + '\n'
         return s
+
+    def create_cols(self, col_ids):
+        if not col_ids:
+            col_ids = [str(i + 1) for i in range(len(self.rows[0]))]
+        for i in range(len(self.rows[0])):
+            for row in self.rows:
+                try:
+                    # self.cols['c' + str(i + 1)].append(Bitset(row[i]))
+                    self.cols[col_ids[i]].append(Bitset(row[i]))
+                except KeyError:
+                    # self.cols['c' + str(i + 1)].append(Bitset(row[i]))
+                    self.cols[col_ids[i]] = Bitset([row[i]])
+
+    def add_row(self, row):
+        self.rows.add(row)
 
     def is_empty(self):
 
@@ -98,10 +110,10 @@ class Matrix:
             self.cols[col_id] = Bitset()
         for row in self.rows:
             for i, col_id in enumerate(self.cols.keys()):
-                self.cols[col_id].append(Bitset(row[i]))
-        self.update_counter1()
+                self.cols[col_id].append(row[i])
+        self.update_counter1_col()
 
-    def update_counter1(self):
+    def update_counter1_col(self):
 
         """
         Aggiorna il contatore degli 1 delle colonne.
@@ -110,6 +122,16 @@ class Matrix:
         self.counter1_col = OrderedDict()
         for col_id, col in self.cols.iteritems():
             self.counter1_col[col_id] = int(col.count())
+
+    # def update_counter1_row(self):
+    #
+    #     """
+    #     Aggiorna il contatore degli 1 delle righe.
+    #     """
+    #
+    #     self.counter1_row = []
+    #     for i, row in enumerate(self.rows):
+    #         self.counter1_row.append((i, int(row.count())))
 
     def submatrix(self, removed_rows=None, removed_cols=None):
 
@@ -136,10 +158,9 @@ class Matrix:
                 self.cols = cols
                 self.update_rows()
                 self.update_cols()
-                self.update_counter1()
+                self.update_counter1_col()
         else:
             self.counter1_col = OrderedDict()
-
 
     def max_cols1(self):
 
@@ -161,6 +182,43 @@ class Matrix:
                 hit_rows.append(i)
         return hit_rows
 
+    # def remove_super_sets(self):
+    #     self.update_counter1_row()
+    #     self.counter1_row = sorted(self.counter1_row, lambda x, y: x[1] - y[1])
+    #     removed_rows = []
+    #     while self.counter1_row:
+    #         counter1_row = []
+    #         row = self.rows[self.counter1_row.pop(0)[0]]
+    #         for j in range(len(self.counter1_row)):
+    #             if self.counter1_row[j][0] not in removed_rows:
+    #                 if row & self.rows[self.counter1_row[j][0]] == row:
+    #                     removed_rows.append(self.counter1_row[j][0])
+    #                 else:
+    #                     counter1_row.append(self.counter1_row[j])
+    #         self.counter1_row = deepcopy(counter1_row)
+    #     rows = OrderedSet()
+    #     for i, row in enumerate(self.rows):
+    #         if i not in removed_rows:
+    #             rows.add(row)
+    #     self.rows = rows
+    #     self.update_counter1_row()
+    #     self.update_cols()
+
+    def remove_super_sets(self):
+        i = 0
+        while i < len(self.rows) - 1:
+            j = i + 1
+            while j < len(self.rows):
+                if self.rows[i] & self.rows[j] == self.rows[j]:
+                    self.rows.remove(self.rows[i])
+                    j = i + 1
+                elif self.rows[i] & self.rows[j] == self.rows[i]:
+                    self.rows.remove(self.rows[j])
+                else:
+                    j += 1
+            i += 1
+        self.update_cols()
+
     def remove_cols_without_1(self):
 
         """
@@ -181,8 +239,8 @@ class Matrix:
 
         """
         Rimuove le colonne duplicate.
-        Gli elementi corrispondenti alle colonne eliminate sono in alternativa con quelli di cui si mantiene una sola
-        occorrenza.
+        Gli elementi corrispondenti alle colonne eliminate sono in alternativa con quelli di cui si mantiene
+        l'occorrenza.
         """
 
         occurrences = OrderedDict()
@@ -239,12 +297,42 @@ class Matrix:
                     col_index = int(row.index(True))
                     col_id = self.cols.keys()[col_index]
                     removed_cols.append(col_id)
-                    col = self.cols[col_id]
-                    for j, bit in enumerate(col):
-                        if bit and j not in removed_rows:
-                            removed_rows.append(j)
+                    # col = self.cols[col_id]
+                    removed_rows.append(i)
+                    # for j, bit in enumerate(col):
+                    #     if bit and j not in removed_rows:
+                    #         removed_rows.append(j)
         self.submatrix(removed_rows, removed_cols)
         return removed_cols
+
+    def partition(self):
+        partitions = [deepcopy(self.rows[0])]
+        for i in range(1, len(self.rows)):
+            matching_partitions = []
+            for j in range(len(partitions)):
+                if (self.rows[i] & partitions[j]).any():
+                    partitions[j] |= self.rows[i]
+                    matching_partitions.append(j)
+            if not matching_partitions:
+                partitions.append(deepcopy(self.rows[i]))
+            else:
+                new_partition = deepcopy(partitions[matching_partitions[0]])
+                for k in matching_partitions[1:]:
+                    new_partition |= partitions[k]
+                partitions = filter(lambda p: partitions.index(p) not in matching_partitions, partitions)
+                partitions.append(new_partition)
+        submatrices = None
+        if len(partitions) > 1:
+            submatrices = [Matrix(col_ids=self.cols.keys()) for _ in range(len(partitions))]
+            for row in self.rows:
+                for i, partition in enumerate(partitions):
+                    if (row & partition).any():
+                        submatrices[i].add_row(deepcopy(row))
+                        break
+            for submatrix in submatrices:
+                submatrix.update_cols()
+                submatrix.remove_cols_without_1()
+        return submatrices
 
     def check_for_rows_without_1(self):
 
@@ -272,6 +360,7 @@ class Matrix:
         while new_dimension != (0, 0) and old_dimension != new_dimension:
             old_dimension = new_dimension
             self.remove_cols_without_1()
+            self.remove_super_sets()
             occurrences = self.remove_duplicated_cols()
             occurrences_list.append(occurrences)
             singletons.append(self.remove_cols_without_0())

@@ -119,6 +119,15 @@ class ProdExpression(Expression):
                 result.append(str(operand))
         return '*'.join(result)
 
+    def to_string(self, prefix):
+        result = []
+        for i, operand in enumerate(self.operands):
+            if isinstance(operand, SumExpression) and operand.count_operands() > 1:
+                result.append('(' + operand.to_string(prefix) + ')')
+            else:
+                result.append(operand.to_string(prefix))
+        return '*'.join(result)
+
 class SumExpression(Expression):
 
     """
@@ -140,6 +149,9 @@ class SumExpression(Expression):
 
         # return '(' + '+'.join([str(op) for op in self.operands]) + ')'
         return '+'.join([str(op) for op in self.operands])
+
+    def to_string(self, prefix):
+        return '+'.join([op.to_string(prefix) for op in self.operands])
 
     def get_is_everywhere_id(self):
         return self.is_everywhere_id
@@ -169,3 +181,6 @@ class AtomicElem:
         """
 
         return self.operand
+
+    def to_string(self, prefix):
+        return prefix + str(self)
