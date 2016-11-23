@@ -158,7 +158,7 @@ class Matrix:
                 self.cols = cols
                 self.update_rows()
                 self.update_cols()
-                self.update_counter1_col()
+                # self.update_counter1_col()
         else:
             self.counter1_col = OrderedDict()
 
@@ -371,3 +371,57 @@ class Matrix:
             new_dimension = (len(self.rows), len(self.cols))
         substitutions_map = get_substitutions_map(occurrences_list)
         return singletons, everywhere_ids, substitutions_map
+
+    def find_next_col(self, compl_cols):
+        if not compl_cols:
+            self.find_complementary_cols(compl_cols)
+        tuples = map(lambda (k, v): (k, len(v)), compl_cols.iteritems())
+        max_count_compl = max(tuples, key=lambda item: item[1])[1]
+        col_ids = [tup[0] for i, tup in enumerate(tuples) if tup[1] == max_count_compl]
+        if max_count_compl == 0:
+            cols_to_consider = range(len(self.cols))
+        else:
+            if len(col_ids) == 1:
+                cols_to_consider = [self.cols.keys().index(col_ids[0])]
+            else:
+                cols_to_consider = [self.cols.keys().index(x) for x in col_ids]
+        col_id = self.cols.keys()[cols_to_consider[0]]
+        count0 = self.count_0_hit_by_col(col_id)
+        for i in cols_to_consider[1:]:
+            new_col_id = self.cols.keys()[i]
+            new_count0 = self.count_0_hit_by_col(new_col_id)
+            if count0 < new_count0 or (count0 == new_count0 and self.counter1_col[col_id] < self.counter1_col[new_col_id]):
+                col_id = new_col_id
+                count0 = new_count0
+        for compl_id in compl_cols.pop(col_id):
+            compl_cols[compl_id].remove(col_id)
+        return col_id
+
+    def find_complementary_cols(self, compl_cols):
+        for col_id in self.cols:
+            compl_cols[col_id] = []
+        for col_id_i, col_i in self.cols.iteritems():
+            for col_id_j, col_j in self.cols.iteritems():
+                if col_id_i != col_id_j and (col_i | col_j).all():
+                    compl_cols[col_id_i].append(col_id_j)
+
+    def count_0_hit_by_col(self, col_id):
+        col = self.cols[col_id]
+        count = 0
+        for i in range(len(col)):
+            if col[i]:
+                count += self.rows[i].count(False)
+        return count
+
+    def to_json(self):
+        json = '{\n\t"sets": [\n\t\t'
+        sets = []
+        for row in self.rows:
+            _set = []
+            for j, bit in enumerate(row):
+                if bit:
+                    _set.append(int(self.cols.keys()[j]))
+            sets.append(_set)
+        json += ',\n\t\t'.join([str(_set) for _set in sets])
+        json += '\n\t]\n}'
+        return json

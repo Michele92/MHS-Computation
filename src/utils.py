@@ -105,11 +105,12 @@ def compute_mhs(matrix, removed_col=None, removed_rows=None):
                 result.substitute(substitutions_map)
                 prod_expr.add_operand(result)
         else:
+            compl_cols = {}
             while not submatrix.is_empty() and not submatrix.check_for_rows_without_1():
-                max_col_ids = submatrix.max_cols1()
-                # max_col_ids = deepcopy(matrix.cols.keys())
+                # max_col_ids = submatrix.max_cols1()
                 if submatrix.cols:
-                    col_id = max_col_ids.pop(0)
+                    # col_id = max_col_ids.pop(0)
+                    col_id = submatrix.find_next_col(compl_cols)
                     hit_rows = submatrix.hit_rows(col_id)
                     result = compute_mhs(deepcopy(submatrix), col_id, hit_rows)
                     submatrix.submatrix(removed_cols=[col_id])
@@ -128,11 +129,12 @@ def sub_compute_mhs(matrix):
     singletons, everywhere_ids, substitutions_map = matrix.preprocessing()
     expr = generate_expression(singletons, everywhere_ids, substitutions_map)
     sum_expr = SumExpression()
+    compl_cols = {}
     while not matrix.is_empty() and not matrix.check_for_rows_without_1():
-        max_col_ids = matrix.max_cols1()
-        # max_col_ids = deepcopy(matrix.cols.keys())
+        # max_col_ids = matrix.max_cols1()
         if matrix.cols:
-            col_id = max_col_ids.pop(0)
+            # col_id = max_col_ids.pop(0)
+            col_id = matrix.find_next_col(compl_cols)
             hit_rows = matrix.hit_rows(col_id)
             result = compute_mhs(deepcopy(matrix), col_id, hit_rows)
             matrix.submatrix(removed_cols=[col_id])
@@ -202,27 +204,6 @@ def do_substitution(elems, substitutions_map):
                     ss.append(tmp[0])
         s.append(ss)
     return s
-
-def prune(expr):
-    flatten_expr = str(sympy.expand(expr.to_string('c'))).replace(' ', '')
-    hss = flatten_expr.split('+')
-    hss = map(lambda hs: hs.split('*'), sorted(hss, key=len, reverse=True))
-    mhss = []
-    for i, hs in enumerate(hss):
-        mhss.append(hs)
-        for j in range(i + 1, len(hss)):
-            l = len(hss[j])
-            if l < len(hs):
-                for elem in hs:
-                    if elem in hss[j]:
-                        l -= 1
-                    if l == 0:
-                        mhss.remove(hs)
-                        break
-                if l == 0:
-                    break
-    print len(mhss)
-    # expr = '+'.join(map(lambda mhs: '*'.join(mhs), mhss))
 
 def create_dir(dirname):
     if not os.path.exists(dirname):
