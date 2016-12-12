@@ -100,7 +100,7 @@ def compute_mhs(matrix, removed_col=None, removed_rows=None):
     sum_expr = SumExpression()
     for submatrix in submatrices:
         if partitionable:
-            result = sub_compute_mhs(submatrix)
+            result = sub_compute_mhs(deepcopy(submatrix))
             if result:
                 result.substitute(substitutions_map)
                 prod_expr.add_operand(result)
