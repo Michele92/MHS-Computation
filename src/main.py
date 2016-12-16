@@ -1,8 +1,8 @@
-from matrix import *
-from json_sets import *
-import sys
 import re
 import time
+
+from json_sets import *
+from matrix import *
 
 INPUT_DIR = '../../input/'
 OUTPUT_DIR = '../../output/'
@@ -35,6 +35,7 @@ if __name__ == '__main__':
                 expr = compute_mhs(matrix)
                 print str(time.clock() - start)
                 f.write(str(expr))
+                # f.write(re.sub("(.{100})", "\\1\n", str(expr), 0, re.DOTALL))
                 f.write('\n')
                 f.write(str(eval(re.sub(r'[0-9]+', '1', str(expr)))))
             f.close()

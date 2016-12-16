@@ -1,7 +1,8 @@
-from utils import *
 from bitarray import *
-from collections import OrderedDict
 from orderedset import OrderedSet
+
+from utils import *
+
 
 class Bitset(bitarray):
 
@@ -145,7 +146,6 @@ class Matrix:
             for i, row in enumerate(self.rows):
                 if i not in removed_rows:
                     rows.add(row)
-
             self.rows = rows
             self.update_cols()
         if self.cols:
@@ -235,6 +235,75 @@ class Matrix:
         self.cols = cols
         self.update_rows()
 
+    def preprocess_cols(self, remove_duplicated_cols):
+        singleton = []
+        occurrences = OrderedDict()
+        i = 0
+        first_iteration = True
+        while i < len(self.cols):
+            col_id_i = self.cols.keys()[i]
+            if first_iteration:
+                if self.counter1_col[col_id_i] == 0:
+                    self.cols.pop(col_id_i)
+                    self.counter1_col.pop(col_id_i)
+                    continue
+                elif self.cols[col_id_i].all():
+                    if singleton:
+                        if singleton[0] in occurrences:
+                            occurrences[singleton[0]].append(col_id_i)
+                        else:
+                            occurrences[singleton[0]] = [col_id_i]
+                    else:
+                        singleton = [col_id_i]
+                    self.cols.pop(col_id_i)
+                    self.counter1_col.pop(col_id_i)
+                    continue
+            if remove_duplicated_cols:
+                if i < len(self.cols) - 1:
+                    col_id_i = self.cols.keys()[i]
+                    j = i + 1
+                    while j < len(self.cols):
+                        col_id_j = self.cols.keys()[j]
+                        if first_iteration:
+                            if self.counter1_col[col_id_j] == 0:
+                                self.cols.pop(col_id_j)
+                                self.counter1_col.pop(col_id_j)
+                                continue
+                            elif self.cols[col_id_j].all():
+                                if singleton:
+                                    if singleton[0] in occurrences:
+                                        occurrences[singleton[0]].append(col_id_j)
+                                    else:
+                                        occurrences[singleton[0]] = [col_id_j]
+                                else:
+                                    singleton = [col_id_j]
+                                self.cols.pop(col_id_j)
+                                self.counter1_col.pop(col_id_j)
+                                continue
+                        if j < len(self.cols):
+                            col_id_j = self.cols.keys()[j]
+                            if self.counter1_col[col_id_i] == self.counter1_col[col_id_j]:
+                                if self.cols[col_id_i] == self.cols[col_id_j]:
+                                    if col_id_i in occurrences:
+                                        occurrences[col_id_i].append(col_id_j)
+                                    else:
+                                        occurrences[col_id_i] = [col_id_j]
+                                    self.cols.pop(col_id_j)
+                                    self.counter1_col.pop(col_id_j)
+                                else:
+                                    j += 1
+                            else:
+                                j += 1
+                    first_iteration = False
+                    i += 1
+                else:
+                    i += 1
+            else:
+                i += 1
+        self.update_rows()
+        # singleton = self.remove_cols_without_0()
+        return singleton, occurrences
+
     def remove_duplicated_cols(self):
 
         """
@@ -269,17 +338,14 @@ class Matrix:
         Gli elementi corrispondenti alle colonne eliminate rappresentano dei singoletti che devono essere memorizzati.
         """
 
-        cols = OrderedDict()
-        singletons = []
         for col_id, col in self.cols.iteritems():
             if col.all():
-                singletons.append(col_id)
+                singleton = [col_id]
+                self.cols.pop(col_id)
                 self.counter1_col.pop(col_id)
-            else:
-                cols[col_id] = col
-        self.cols = cols
-        self.update_rows()
-        return singletons
+                self.update_rows()
+                return singleton
+        return []
 
     def process_rows_with_unique_1(self):
 
@@ -297,11 +363,7 @@ class Matrix:
                     col_index = int(row.index(True))
                     col_id = self.cols.keys()[col_index]
                     removed_cols.append(col_id)
-                    # col = self.cols[col_id]
                     removed_rows.append(i)
-                    # for j, bit in enumerate(col):
-                    #     if bit and j not in removed_rows:
-                    #         removed_rows.append(j)
         self.submatrix(removed_rows, removed_cols)
         return removed_cols
 
@@ -354,22 +416,29 @@ class Matrix:
 
         old_dimension = (-1, -1)
         new_dimension = (len(self.rows), len(self.cols))
-        occurrences_list = []
         everywhere_ids = []
         singletons = []
+        substitutions_map = OrderedDict()
+        self.remove_super_sets()
+        remove_duplicated_cols = True
         while new_dimension != (0, 0) and old_dimension != new_dimension:
             old_dimension = new_dimension
-            self.remove_cols_without_1()
-            self.remove_super_sets()
-            occurrences = self.remove_duplicated_cols()
-            occurrences_list.append(occurrences)
-            singletons.append(self.remove_cols_without_0())
+            singleton, occurrences = self.preprocess_cols(remove_duplicated_cols)
+            singletons.append(singleton)
+            if remove_duplicated_cols:
+                substitutions_map = deepcopy(occurrences)
+            # self.remove_cols_without_1()
+            # occurrences = self.remove_duplicated_cols()
+            # occurrences_list.append(occurrences)
+            # singletons.append(self.remove_cols_without_0())
             if not self.check_for_rows_without_1():
                 everywhere_ids.append(self.process_rows_with_unique_1())
             else:
                 everywhere_ids.append([])
             new_dimension = (len(self.rows), len(self.cols))
-        substitutions_map = get_substitutions_map(occurrences_list)
+            remove_duplicated_cols = False
+        # substitutions_map = get_substitutions_map(occurrences_list)
+
         return singletons, everywhere_ids, substitutions_map
 
     def find_next_col(self, compl_cols):
