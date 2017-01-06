@@ -4,61 +4,6 @@ from copy import deepcopy
 
 from expression import *
 
-
-def reverse_dict(d):
-    """
-    Restituisce un dizionario avente chiavi e valori scambiati rispetto a quello passato come parametro.
-    """
-
-    reversed_dict = OrderedDict()
-    for key, value in d.iteritems():
-        reversed_dict[value] = key
-    return reversed_dict
-
-
-def get_substitutions_map(occurrences_list):
-    """
-    Determina la mappa delle sostituzioni delle colonne.
-    Restituisce un dizionario le cui chiavi sono gli id delle colonne di cui si tiene l'istanza e i valori sono liste
-    di id delle colonne duplicate.
-    """
-
-    substitutions_map = OrderedDict()
-    for occurrences in occurrences_list:
-        occurrences_old = deepcopy(occurrences)
-        occurrences_rev = reverse_dict(occurrences)
-        keys = []
-        while occurrences:
-            key, value = occurrences.popitem(0)
-            if key in substitutions_map:
-                _key = value
-                substitutions_map[key].append(_key)
-                while _key in occurrences:
-                    substitutions_map[key].append(occurrences[_key])
-                    _key = occurrences.pop(_key)
-                if key in occurrences_rev:
-                    _key = occurrences_rev.pop(key)
-                    substitutions_map[key].append(_key)
-                    while _key in occurrences_rev:
-                        substitutions_map[key].append(occurrences_rev[_key])
-                        _key = occurrences_rev.pop(_key)
-            else:
-                keys.append(key)
-        while keys:
-            key = keys.pop(0)
-            values = []
-            for value_list in substitutions_map.values():
-                values += value_list
-            if key not in values:
-                substitutions_map[key] = []
-                _key = occurrences_old.pop(key)
-                substitutions_map[key].append(_key)
-                while _key in occurrences_old:
-                    substitutions_map[key].append(occurrences_old[_key])
-                    _key = occurrences_old.pop(_key)
-    return substitutions_map
-
-
 def max_cols1(counter1):
     """
     Restituisce la lista di chiavi di un dizionario aventi i valori massimi.
@@ -75,18 +20,21 @@ def max_cols1(counter1):
     return col_ids
 
 
-def compute_mhs(matrix, removed_col=None, removed_rows=None):
+def compute_mhs(matrix, original_matrix=None, removed_cols=None, removed_rows=None):
     """
     Completa il calcolo dei MHS elaborando una colonna ad ogni iterazione.
     In ciascuna iterazione si elimina una colonna e le righe in cui compare un 1 e si effettua il preprocessing
     sulla sottomatrice cosi' ottenuta.
     """
 
-    if removed_col:
+    if not original_matrix:
+        original_matrix = deepcopy(matrix)
+    if removed_cols:
         matrix.submatrix(removed_rows=removed_rows)
-        matrix.submatrix(removed_cols=[removed_col])
-    singletons, everywhere_ids, substitutions_map = matrix.preprocessing()
-    expr = generate_expression(singletons, everywhere_ids, substitutions_map)
+        matrix.submatrix(removed_cols=removed_cols)
+        original_matrix.set_grey_rows(removed_cols[0])
+    singletons, everywhere_ids = matrix.preprocessing()
+    expr = generate_expression(singletons, everywhere_ids, original_matrix)
     if matrix.is_empty():
         return expr
     submatrices = matrix.partition()
@@ -98,23 +46,24 @@ def compute_mhs(matrix, removed_col=None, removed_rows=None):
     sum_expr = SumExpression()
     for submatrix in submatrices:
         if partitionable:
-            result = sub_compute_mhs(deepcopy(submatrix))
+            result = sub_compute_mhs(deepcopy(submatrix), original_matrix)
             if result:
-                result.substitute(substitutions_map)
                 prod_expr.add_operand(result)
         else:
             compl_cols = OrderedDict()
             while not submatrix.is_empty() and not submatrix.check_for_rows_without_1():
-                # max_col_ids = submatrix.max_cols1()
-                # if submatrix.cols:
-                # col_id = max_col_ids.pop(0)
+                # col_id = deepcopy(submatrix.cols.keys()).pop(0)
                 col_id = submatrix.find_next_col(compl_cols)
+                copy_original_matrix = deepcopy(original_matrix)
+                if copy_original_matrix.check_hit_grey_rows(col_id):
+                    submatrix.submatrix(removed_cols=[col_id])
+                    continue
                 hit_rows = submatrix.hit_rows(col_id)
-                result = compute_mhs(deepcopy(submatrix), col_id, hit_rows)
+                super_cols = submatrix.remove_super_cols(col_id)
+                result = compute_mhs(deepcopy(submatrix), copy_original_matrix, [col_id] + super_cols, hit_rows)
                 submatrix.submatrix(removed_cols=[col_id])
                 if result and not result.is_empty():
                     sum_expr.add_operand(ProdExpression([AtomicElem(col_id), result]))
-            sum_expr.substitute(substitutions_map)
     result = sum_expr
     if partitionable:
         result = prod_expr
@@ -126,9 +75,9 @@ def compute_mhs(matrix, removed_col=None, removed_rows=None):
     return expr
 
 
-def sub_compute_mhs(matrix):
-    singletons, everywhere_ids, substitutions_map = matrix.preprocessing()
-    expr = generate_expression(singletons, everywhere_ids, substitutions_map)
+def sub_compute_mhs(matrix, original_matrix):
+    singletons, everywhere_ids = matrix.preprocessing()
+    expr = generate_expression(singletons, everywhere_ids, original_matrix)
     sum_expr = SumExpression()
     compl_cols = OrderedDict()
     while not matrix.is_empty() and not matrix.check_for_rows_without_1():
@@ -136,12 +85,15 @@ def sub_compute_mhs(matrix):
         # if matrix.cols:
         # col_id = max_col_ids.pop(0)
         col_id = matrix.find_next_col(compl_cols)
+        if original_matrix.check_hit_grey_rows(col_id):
+            matrix.submatrix(removed_cols=[col_id])
+            continue
         hit_rows = matrix.hit_rows(col_id)
-        result = compute_mhs(deepcopy(matrix), col_id, hit_rows)
+        super_cols = matrix.remove_super_cols(col_id)
+        result = compute_mhs(deepcopy(matrix), deepcopy(original_matrix), [col_id] + super_cols, hit_rows)
         matrix.submatrix(removed_cols=[col_id])
         if result and not result.is_empty():
             sum_expr.add_operand(ProdExpression([AtomicElem(col_id), result]))
-    sum_expr.substitute(substitutions_map)
     if not expr:
         return sum_expr
     if not sum_expr.is_empty():
@@ -150,62 +102,53 @@ def sub_compute_mhs(matrix):
     return expr
 
 
-def generate_expression(singletons, everywhere_ids, substitutions_map):
+def generate_expression(singletons, everywhere_ids, original_matrix):
     """
     Genera un'espressione temporanea sulla base dei singoletti, degli id degli elementi appartenenti a tutti i mhs del
     contesto attuale e della mappa delle sostituzioni.
     """
-    singletons, everywhere_ids = substitute(singletons, everywhere_ids, substitutions_map)
+
+    singletons, everywhere_ids = keep_valid_solutions(singletons, everywhere_ids, original_matrix)
+    singletons = build_elements(singletons)
+    everywhere_ids = build_elements(everywhere_ids)
     expr = None
     for i in range(len(singletons) - 1, -1, -1):
         prod = ProdExpression()
         if expr:
             prod.add_operand(expr)
         if everywhere_ids[i]:
-            prod.add_operands([e for e in everywhere_ids[i]])
+            prod.add_operands(everywhere_ids[i])
         if singletons[i]:
-            expr = SumExpression([s for s in singletons[i]])
+            expr = SumExpression(singletons[i])
             if not prod.is_empty():
                 expr.add_operand(prod)
         elif not prod.is_empty():
             expr = prod
     return expr
 
+def keep_valid_solutions(singletons, everywhere_ids, original_matrix):
+    for k in range(len(singletons)):
+        i = 0
+        s = singletons[k]
+        while i < len(s):
+            if deepcopy(original_matrix).check_hit_grey_rows(s[i]):
+                s.pop(i)
+            else:
+                i += 1
+        i = 0
+        e = everywhere_ids[k]
+        while i < len(e):
+            if original_matrix.check_hit_grey_rows(e[i]):
+                everywhere_ids[k] = []
+                singletons = singletons[:k+1]
+                everywhere_ids = everywhere_ids[:k+1]
+                return singletons, everywhere_ids
+            original_matrix.set_grey_rows(e[i])
+            i += 1
+    return singletons, everywhere_ids
 
-def substitute(singletons, everywhere_ids, substitutions_map):
-    """
-    Effettua la sostituzione degli id nei singoletti e negli elementi appartenenti a tutti i mhs del contesto attuale,
-    sfruttando la mappa delle sostituzioni.
-    """
-
-    s = do_substitution(singletons, substitutions_map)
-    e = do_substitution(everywhere_ids, substitutions_map)
-    for operands_list in e:
-        for operand in operands_list:
-            if isinstance(operand, SumExpression):
-                operand.set_is_everywhere_id()
-    return s, e
-
-
-def do_substitution(elems, substitutions_map):
-    """
-    Sostituisce gli elementi di una lista con le espressioni corrispondenti, sulla base della mappa delle sostituzioni.
-    """
-
-    s = []
-    for i in range(len(elems)):
-        ss = []
-        if elems[i]:
-            for elem in elems[i]:
-                tmp = [AtomicElem(elem)]
-                if elem in substitutions_map:
-                    tmp += [AtomicElem(e) for e in substitutions_map[elem]]
-                    ss.append(SumExpression(tmp))
-                else:
-                    ss.append(tmp[0])
-        s.append(ss)
-    return s
-
+def build_elements(elems):
+    return [[AtomicElem(_id) for _id in elem] for elem in elems]
 
 def create_dir(dirname):
     if not os.path.exists(dirname):
