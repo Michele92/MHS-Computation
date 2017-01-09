@@ -1,19 +1,39 @@
+"""Contiene le classi per rappresentare la matrice di input"""
+
+from collections import OrderedDict
+
 from bitarray import *
 from orderedset import OrderedSet
 
-from utils import *
+class CustomSet(OrderedSet):
 
+    """Classe wrapper utile per il debug"""
+
+    def __repr__(self):
+        return '{' + ', '.join([repr(self.__getitem__(i)) for i in range(len(self))]) + '}'
+
+class CustomList(list):
+
+    """Classe wrapper utile per il debug"""
+
+    def __repr__(self):
+        return '[' + ', '.join([repr(self.__getitem__(i)) for i in range(len(self))]) + ']'
 
 class Bitset(bitarray):
 
-    """
-    Rappresenta la sequenza di bit di una colonna della matrice.
-    """
+    """Classe wrapper che rappresenta un vettore di valori binari"""
 
     def __hash__(self):
         return self.to01().__hash__()
 
 class Row:
+
+    """
+    Rappresenta una riga della matrice.
+    E' caratterizzata dai seguenti attributi:
+        - bitset, la sequenza di valori binari contenuti nella riga
+        - grey_level, il livello di grigio associato alla riga
+    """
 
     def __init__(self, bitset=None, grey_level=0):
         self.bitset = bitset
@@ -31,10 +51,10 @@ class Row:
         return self.bitset[item]
 
     def __and__(self, other):
-        return Row(self.bitset & other.bitset)
+        return Row(bitset=self.bitset & other.bitset)
 
     def __or__(self, other):
-        return Row(self.bitset | other.bitset)
+        return Row(bitset=self.bitset | other.bitset)
 
     def __ior__(self, other):
         self.bitset |= other.bitset
@@ -48,6 +68,15 @@ class Row:
 
     def __str__(self):
         return self.bitset.to01()
+
+    def __repr__(self):
+        return self.bitset.to01() + ' [' + str(self.grey_level) + ']'
+
+    def get_grey_level(self):
+        return self.grey_level
+
+    def set_grey_level(self, grey_level):
+        self.grey_level = grey_level
 
     def append(self, item):
         return self.bitset.append(item)
@@ -64,135 +93,138 @@ class Row:
     def all(self):
         return self.bitset.all()
 
+class Column:
+
+    """
+    Rappresenta una colonna della matrice.
+    E' caratterizzata dai seguenti attributi:
+        - _id, l'identificatore associato alla colonna
+        - bitset, la sequenza di valori binari contenuti nella colonna
+    """
+
+    def __init__(self, _id=None, bitset=None):
+        self._id = _id
+        self.bitset = bitset
+        if not bitset:
+            self.bitset = Bitset()
+
+    def __len__(self):
+        return len(self.bitset)
+
+    def __getitem__(self, item):
+        return self.bitset[item]
+
+    def __and__(self, other):
+        return Column(bitset=self.bitset & other.bitset)
+
+    def __or__(self, other):
+        return Column(bitset=self.bitset | other.bitset)
+
+    def __eq__(self, other):
+        return self.bitset == other.bitset
+
+    def __ne__(self, other):
+        return self.bitset != other.bitset
+
+    def __str__(self):
+        return self.bitset.to01()
+
+    def __repr__(self):
+        return '[' + self._id + '] ' + self.bitset.to01()
+
+    def get_id(self):
+        return self._id
+
+    def append(self, item):
+        return self.bitset.append(item)
+
+    def count(self, value=True):
+        return self.bitset.count(value)
+
+    def any(self):
+        return self.bitset.any()
+
+    def all(self):
+        return self.bitset.all()
+
 class Matrix:
 
     """
-    Rappresenta il concetto cardine del calcolo dei MHS.
-    E' dotata di:
-        > un insieme ordinato di bitarray che rappresentano le righe
-        > un dizionario che mappa gli id delle colonne con i Bitset, rappresentanti le colonne stesse
-        > un dizionario che mappa gli id delle colonne con il numero di 1 contenuti nelle stesse (euristica)
+    Rappresenta la matrice di input.
+    E' caratterizzata dai seguenti attributi:
+        - rows, l'insieme ordinato di righe
+        - cols, la lista di colonne
     """
 
-    def __init__(self, rows=None, col_ids=None):
-
-        """
-        Inizializza la matrice a partire da una lista di stringhe che rappresentano le righe.
-        """
-
-        self.rows = OrderedSet()
-        self.cols = OrderedDict()
+    def __init__(self, rows=None):
+        self.rows = CustomSet()
+        self.cols = CustomList()
         self.counter1_col = OrderedDict()
         if rows:
             for row in rows:
-                self.rows.add(Row(Bitset(row)))
-            self.create_cols(col_ids)
+                self.rows.add(Row(bitset=Bitset(row)))
+            self.create_cols()
             self.update_counter1_col()
-            # self.update_counter1_row()
-        else:
-            for col_id in col_ids:
-                self.cols[col_id] = None
 
     def __str__(self):
-
-        """
-        Crea e restituisce una rappresentazione della matrice in forma testuale.
-        """
-
         if self.is_empty():
             return 'Empty matrix'
-
-        s = ' '.join(['%5s' % col_id for col_id in self.cols.keys()])
-        s += '\n'
+        s = ' '.join(['%5s' % col.get_id() for col in self.cols]) + '\n'
         for row in self.rows:
-            s += ' '.join(['%5s' % bit for bit in row.bitset.to01()]) + '\n'
+            s += ' '.join(['%5s' % bit for bit in str(row)]) + '\n'
         return s
 
-    def create_cols(self, col_ids):
-        if not col_ids:
-            col_ids = [str(i + 1) for i in range(len(self.rows[0]))]
-        for i in range(len(self.rows[0])):
-            for row in self.rows:
-                try:
-                    # self.cols['c' + str(i + 1)].append(Bitset(row[i]))
-                    self.cols[col_ids[i]].append(Bitset(row[i]))
-                except KeyError:
-                    # self.cols['c' + str(i + 1)].append(Bitset(row[i]))
-                    self.cols[col_ids[i]] = Bitset([row[i]])
+    def get_col_by_id(self, col_id):
+        for col in self.cols:
+            if col.get_id() == col_id:
+                return col
+        return None
 
-    def add_row(self, row):
-        self.rows.add(row)
+    def create_cols(self):
+        col_ids = [str(i+1) for i in range(len(self.rows[0]))]
+        for i in range(len(self.rows[0])):
+            bitset = Bitset()
+            for row in self.rows:
+                bitset.append(row[i])
+            self.cols.append(Column(col_ids[i], bitset))
 
     def is_empty(self):
-
-        """
-        Verifica se la matrice e' vuota, ovvero se e' priva di righe.
-        """
-
         return len(self.rows) == 0
 
     def update_rows(self):
-
-        """
-        Aggiorna le righe eliminando in ognuna i bit nelle posizioni interessate dall'eventuale precedente eliminazione
-        delle rispettive colonne.
-        """
-
-        rows = OrderedSet()
-        if self.cols:
-            for i in range(len(self.rows)):
-                row = Row()
-                for col in self.cols.values():
-                    row.append(Bitset(col[i]))
-                rows.add(row)
+        if not self.cols:
+            self.rows = CustomSet()
+            return
+        rows = CustomSet()
+        for i in range(len(self.rows)):
+            bitset = Bitset()
+            for col in self.cols:
+                bitset.append(col[i])
+            rows.add(Row(bitset))
         self.rows = rows
 
     def update_cols(self):
-
-        """
-        Analogo a update_rows.
-        Aggiorna le colonne eliminando in ognuna i bit nelle posizioni interessate dall'eventuale precedente
-        eliminazione delle rispettive righe.
-        """
-
         if not self.rows:
-            self.cols = OrderedDict()
+            self.cols = CustomList()
             return
-        for col_id in self.cols.keys():
-            self.cols[col_id] = Bitset()
-        for row in self.rows:
-            for i, col_id in enumerate(self.cols.keys()):
-                self.cols[col_id].append(row[i])
+        cols = CustomList()
+        for i in range(len(self.cols)):
+            col_id = self.cols[i].get_id()
+            bitset = Bitset()
+            for row in self.rows:
+                bitset.append(row[i])
+            cols.append(Column(col_id, bitset))
+        self.cols = cols
         self.update_counter1_col()
 
     def update_counter1_col(self):
-
-        """
-        Aggiorna il contatore degli 1 delle colonne.
-        """
-
         self.counter1_col = OrderedDict()
-        for col_id, col in self.cols.iteritems():
-            self.counter1_col[col_id] = int(col.count())
-
-    # def update_counter1_row(self):
-    #
-    #     """
-    #     Aggiorna il contatore degli 1 delle righe.
-    #     """
-    #
-    #     self.counter1_row = []
-    #     for i, row in enumerate(self.rows):
-    #         self.counter1_row.append((i, int(row.count())))
+        for col in self.cols:
+            self.counter1_col[col.get_id()] = int(col.count())
 
     def submatrix(self, removed_rows=None, removed_cols=None):
-
-        """
-        Rimuove dalla matrice le righe e le colonne specificate.
-        """
-
-        rows = OrderedSet()
-        cols = OrderedDict()
+        rows = CustomSet()
+        cols = CustomList()
         if removed_rows:
             for i, row in enumerate(self.rows):
                 if i not in removed_rows:
@@ -201,326 +233,181 @@ class Matrix:
             self.update_cols()
         if self.cols:
             if removed_cols:
-                for col_id, col in self.cols.iteritems():
-                    if col_id not in removed_cols:
-                        cols[col_id] = col
-                    # else:
-                    #     self.counter1_col.pop(col_id)
+                for col in self.cols:
+                    if col.get_id() not in removed_cols:
+                        cols.append(col)
                 self.cols = cols
                 self.update_rows()
                 self.update_cols()
-                # self.update_counter1_col()
         else:
             self.counter1_col = OrderedDict()
 
-    def max_cols1(self):
-
-        """
-        Restituisce la lista degli id delle colonne contenenti il maggior numero di 1.
-        """
-
-        return max_cols1(self.counter1_col)
-
     def max_grey_level(self):
-        result = self.rows[0].grey_level
+        result = self.rows[0].get_grey_level()
         for i in range(1, len(self.rows)):
-            if self.rows[i].grey_level > result:
-                result = self.rows[i].grey_level
+            if self.rows[i].get_grey_level() > result:
+                result = self.rows[i].get_grey_level()
         return result
 
     def get_grey_scale_count(self):
         grey_scale_count = {}
         for row in self.rows:
-            if row.grey_level in grey_scale_count:
-                grey_scale_count[row.grey_level] += 1
+            grey_level = row.get_grey_level()
+            if grey_level in grey_scale_count:
+                grey_scale_count[grey_level] += 1
             else:
-                grey_scale_count[row.grey_level] = 1
+                grey_scale_count[grey_level] = 1
         return grey_scale_count
 
-    def check_hit_grey_rows(self, col_id):
+    def check_for_hit_grey_rows(self, col_id):
         grey_scale_count = self.get_grey_scale_count()
         removed_rows = []
-        for i, bit in enumerate(self.cols[col_id]):
+        col = self.get_col_by_id(col_id)
+        for i, bit in enumerate(col):
             if bit:
-                if self.rows[i].grey_level > 0:
+                if self.rows[i].get_grey_level() > 0:
                     removed_rows.append(i)
-                grey_scale_count[self.rows[i].grey_level] -= 1
-                if grey_scale_count[self.rows[i].grey_level] == 0:
-                    if self.rows[i].grey_level != 0:
+                grey_level = self.rows[i].get_grey_level()
+                grey_scale_count[grey_level] -= 1
+                if grey_scale_count[grey_level] == 0:
+                    if grey_level != 0:
                         return True
         self.submatrix(removed_rows=removed_rows)
         return False
 
     def set_grey_rows(self, col_id):
         new_grey_level = self.max_grey_level() + 1
-        for i, bit in enumerate(self.cols[col_id]):
+        col = self.get_col_by_id(col_id)
+        for i, bit in enumerate(col):
             if bit:
-                self.rows[i].grey_level = new_grey_level
+                self.rows[i].set_grey_level(new_grey_level)
 
     def hit_rows(self, col_id):
-
-        """
-        Restituisce gli indici delle righe colpite da una colonna.
-        """
-
         hit_rows = []
-        for i, bit in enumerate(self.cols[col_id]):
+        col = self.get_col_by_id(col_id)
+        for i, bit in enumerate(col):
             if bit:
                 hit_rows.append(i)
         return hit_rows
-
-    # def remove_super_sets(self):
-    #     self.update_counter1_row()
-    #     self.counter1_row = sorted(self.counter1_row, lambda x, y: x[1] - y[1])
-    #     removed_rows = []
-    #     while self.counter1_row:
-    #         counter1_row = []
-    #         row = self.rows[self.counter1_row.pop(0)[0]]
-    #         for j in range(len(self.counter1_row)):
-    #             if self.counter1_row[j][0] not in removed_rows:
-    #                 if row & self.rows[self.counter1_row[j][0]] == row:
-    #                     removed_rows.append(self.counter1_row[j][0])
-    #                 else:
-    #                     counter1_row.append(self.counter1_row[j])
-    #         self.counter1_row = deepcopy(counter1_row)
-    #     rows = OrderedSet()
-    #     for i, row in enumerate(self.rows):
-    #         if i not in removed_rows:
-    #             rows.add(row)
-    #     self.rows = rows
-    #     self.update_counter1_row()
-    #     self.update_cols()
 
     def remove_super_sets(self):
         i = 0
         while i < len(self.rows) - 1:
             j = i + 1
             while j < len(self.rows):
-                if (self.rows[i] & self.rows[j]) == self.rows[j]:
+                if (self.rows[i] & self.rows[j]) == self.rows[i]:
+                    self.rows.remove(self.rows[j])
+                elif (self.rows[i] & self.rows[j]) == self.rows[j]:
                     self.rows.remove(self.rows[i])
                     j = i + 1
-                elif (self.rows[i] & self.rows[j]) == self.rows[i]:
-                    self.rows.remove(self.rows[j])
                 else:
                     j += 1
             i += 1
         self.update_cols()
 
-    def remove_cols_without_1(self):
-
-        """
-        Rimuove le colonne che non contengono alcun 1.
-        Gli elementi corrispondenti alle colonne eliminate non appartengono ad alcun insieme.
-        """
-
-        cols = OrderedDict()
-        for col_id, col in self.cols.iteritems():
-            if col.any():
-                cols[col_id] = col
-            else:
-                self.counter1_col.pop(col_id)
-        self.cols = cols
-        self.update_rows()
-
-    def preprocess_cols(self):
+    def process_cols(self):
         singletons = []
         i = 0
         while i < len(self.cols):
-            if self.counter1_col[self.cols.keys()[i]] == 0:
-                self.cols.pop(self.cols.keys()[i])
-            elif self.cols[self.cols.keys()[i]].all():
-                singletons.append(self.cols.keys()[i])
-                self.cols.pop(self.cols.keys()[i])
+            if not self.cols[i].any():
+                self.cols.pop(i)
+            elif self.cols[i].all():
+                singletons.append(self.cols[i].get_id())
+                self.cols.pop(i)
             else:
                 i += 1
         self.update_rows()
         return singletons
 
-    def remove_duplicated_cols(self):
-
-        """
-        Rimuove le colonne duplicate.
-        Gli elementi corrispondenti alle colonne eliminate sono in alternativa con quelli di cui si mantiene
-        l'occorrenza.
-        """
-
-        occurrences = OrderedDict()
-        for i, col_id1 in enumerate(self.counter1_col.keys()):
-            count_ones_1 = self.counter1_col[col_id1]
-            for col_id2 in self.counter1_col.keys()[i+1:]:
-                count_ones_2 = self.counter1_col[col_id2]
-                if count_ones_1 == count_ones_2:
-                    if self.cols[col_id1] == self.cols[col_id2]:
-                        occurrences[col_id1] = col_id2
-                        break
-        cols = OrderedDict()
-        for col_id, col in self.cols.iteritems():
-            if col_id not in occurrences.values():
-                cols[col_id] = col
-            else:
-                self.counter1_col.pop(col_id)
-        self.cols = cols
-        self.update_rows()
-        return occurrences
-
-    def remove_cols_without_0(self):
-
-        """
-        Rimuove le colonne che non contengono alcuno 0.
-        Gli elementi corrispondenti alle colonne eliminate rappresentano dei singoletti che devono essere memorizzati.
-        """
-
-        for col_id, col in self.cols.iteritems():
-            if col.all():
-                singleton = [col_id]
-                self.cols.pop(col_id)
-                self.counter1_col.pop(col_id)
-                self.update_rows()
-                return singleton
-        return []
-
     def process_rows_with_unique_1(self):
-
-        """
-        Elabora le righe che contengono un unico 1.
-        Gli elementi corrispondenti alle posizioni degli 1 appartengono a tutti i MHS, pertanto si possono eliminare le
-        righe e le colonne interessate e memorizzare gli elementi cosi' trovati.
-        """
-
         removed_rows = []
         removed_cols = []
         for i, row in enumerate(self.rows):
             if i not in removed_rows:
                 if row.count() == 1:
-                    col_index = int(row.index(True))
-                    col_id = self.cols.keys()[col_index]
-                    removed_cols.append(col_id)
+                    col = self.cols[int(row.index(True))]
+                    removed_cols.append(col.get_id())
                     removed_rows.append(i)
         self.submatrix(removed_rows, removed_cols)
         return removed_cols
 
-    def remove_super_cols(self, col_id):
+    def get_super_cols(self, col_id):
+        input_col = self.get_col_by_id(col_id)
         super_cols = []
-        for _id, col in self.cols.iteritems():
-            if _id != col_id:
-                if (col & self.cols[col_id]) == self.cols[col_id]:
-                    super_cols.append(_id)
+        for col in self.cols:
+            if col.get_id() != col_id:
+                if (col & input_col) == input_col:
+                    super_cols.append(col.get_id())
         return super_cols
 
-    def partition(self):
-        partitions = [deepcopy(self.rows[0])]
-        for i in range(1, len(self.rows)):
-            matching_partitions = []
-            for j in range(len(partitions)):
-                if (self.rows[i] & partitions[j]).any():
-                    partitions[j] |= self.rows[i]
-                    matching_partitions.append(j)
-            if not matching_partitions:
-                partitions.append(deepcopy(self.rows[i]))
-            else:
-                new_partition = deepcopy(partitions[matching_partitions[0]])
-                for k in matching_partitions[1:]:
-                    new_partition |= partitions[k]
-                partitions = filter(lambda p: partitions.index(p) not in matching_partitions, partitions)
-                partitions.append(new_partition)
-        submatrices = None
-        if len(partitions) > 1:
-            submatrices = [Matrix(col_ids=self.cols.keys()) for _ in range(len(partitions))]
-            for row in self.rows:
-                for i, partition in enumerate(partitions):
-                    if (row & partition).any():
-                        submatrices[i].add_row(deepcopy(row))
-                        break
-            for submatrix in submatrices:
-                submatrix.update_cols()
-                submatrix.remove_cols_without_1()
-        return submatrices
-
     def check_for_rows_without_1(self):
-
-        """
-        Controlla se ci sono righe composte da soli zeri.
-        """
-
         for row in self.rows:
             if not row.any():
                 return True
         return False
 
     def preprocessing(self):
-
-        """
-        Effettua il preprocessing in maniera iterativa, invocando uno dopo l'altro i metodi sopraelencati.
-        Costruisce progressivamente l'espressione dei MHS.
-        """
-
         old_dimension = (-1, -1)
         new_dimension = (len(self.rows), len(self.cols))
-        everywhere_ids = []
         singletons = []
+        everywhere_ids = []
         self.remove_super_sets()
-        while new_dimension != (0, 0) and old_dimension != new_dimension:
+        while new_dimension != (0, 0) and new_dimension != old_dimension:
             old_dimension = new_dimension
-            singleton = self.preprocess_cols()
-            singletons.append(singleton)
+            singletons.append(self.process_cols())
             if not self.check_for_rows_without_1():
                 everywhere_ids.append(self.process_rows_with_unique_1())
             else:
                 everywhere_ids.append([])
             new_dimension = (len(self.rows), len(self.cols))
-
         return singletons, everywhere_ids
 
-    def find_next_col(self, compl_cols):
-        if not compl_cols:
-            self.find_complementary_cols(compl_cols)
-        tuples = map(lambda (k, v): (k, len(v)), compl_cols.iteritems())
-        max_count_compl = max(tuples, key=lambda item: item[1])[1]
-        col_ids = [tup[0] for i, tup in enumerate(tuples) if tup[1] == max_count_compl]
-        if max_count_compl == 0:
+    def find_next_col(self, complementary_cols):
+        if not complementary_cols:
+            complementary_cols = self.find_complementary_cols()
+        complementary_cols_count = map(lambda (k, v): (k, len(v)), complementary_cols.iteritems())
+        max_count = max(complementary_cols_count, key=lambda item: item[1])[1]
+        col_ids = [count[0] for count in complementary_cols_count if count[1] == max_count]
+        if max_count == 0:
             cols_to_consider = range(len(self.cols))
         else:
-            if len(col_ids) == 1:
-                cols_to_consider = [self.cols.keys().index(col_ids[0])]
-            else:
-                cols_to_consider = [self.cols.keys().index(x) for x in col_ids]
-        col_id = self.cols.keys()[cols_to_consider[0]]
+            cols_to_consider = [self.cols.index(self.get_col_by_id(col_id)) for col_id in col_ids]
+        col_id = self.cols[cols_to_consider[0]].get_id()
         count0 = self.count_0_hit_by_col(col_id)
         for i in cols_to_consider[1:]:
-            new_col_id = self.cols.keys()[i]
+            new_col_id = self.cols[i].get_id()
             new_count0 = self.count_0_hit_by_col(new_col_id)
             if count0 < new_count0 or (count0 == new_count0 and self.counter1_col[col_id] < self.counter1_col[new_col_id]):
                 col_id = new_col_id
                 count0 = new_count0
-        for compl_id in compl_cols.pop(col_id):
-            compl_cols[compl_id].remove(col_id)
+        for complementary_col_id in complementary_cols.pop(col_id):
+            complementary_cols[complementary_col_id].remove(col_id)
         return col_id
 
-    def find_complementary_cols(self, compl_cols):
-        for col_id in self.cols:
-            compl_cols[col_id] = []
-        for col_id_i, col_i in self.cols.iteritems():
-            for col_id_j, col_j in self.cols.iteritems():
-                if col_id_i != col_id_j and (col_i | col_j).all():
-                    compl_cols[col_id_i].append(col_id_j)
+    def find_complementary_cols(self):
+        complementary_cols = OrderedDict()
+        for col in self.cols:
+            complementary_cols[col.get_id()] = []
+        for col_i in self.cols:
+            for col_j in self.cols:
+                if col_i.get_id() != col_j.get_id() and (col_i | col_j).all():
+                    complementary_cols[col_i.get_id()].append(col_j.get_id())
+        return complementary_cols
 
     def count_0_hit_by_col(self, col_id):
-        col = self.cols[col_id]
+        col = self.get_col_by_id(col_id)
         count = 0
         for i in range(len(col)):
             if col[i]:
                 count += self.rows[i].count(False)
         return count
 
-    def to_json(self):
-        json = '{\n\t"sets": [\n\t\t'
+    def to_sets(self):
         sets = []
         for row in self.rows:
-            _set = []
+            _set = set()
             for j, bit in enumerate(row):
                 if bit:
-                    _set.append(int(self.cols.keys()[j]))
+                    _set.add(self.cols[j].get_id())
             sets.append(_set)
-        json += ',\n\t\t'.join([str(_set) for _set in sets])
-        json += '\n\t]\n}'
-        return json
+        return sets

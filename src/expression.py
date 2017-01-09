@@ -1,186 +1,126 @@
+"""Contiene le classi per rappresentare l'espressione dei minimal hitting set"""
+
+class AtomicElement:
+
+    """
+    Rappresenta un elemento atomico dell'espressione, dunque l'id di una colonna
+    """
+
+    def __init__(self, operand):
+        self.operand = operand
+
+    def __str__(self):
+        return str(self.operand)
+
 class Expression(object):
 
     """
     Rappresenta un'espressione generica.
-    Puo' specializzarsi nelle classi SumExpression e ProdExpression a seconda dell'operatore coinvolto.
+    Puo' specializzarsi nelle classi SumExpression e ProductExpression a seconda dell'operatore coinvolto.
     Gli operandi possono essere a loro volta espressioni (istanze di Expression) o elementi atomici (istanze di
-    AtomicElem).
+    AtomicElement)
     """
 
     def __init__(self, operands):
-
-        """
-        Inizializza l'espressione con la lista degli operandi.
-        """
         if not operands:
             self.operands = []
         else:
             self.operands = operands
 
     def add_operands(self, operands):
-
-        """
-        Concatena gli elementi di due espressioni.
-        """
-
         self.operands += operands
 
     def add_operand(self, operand):
-
-        """
-        Aggiunge un operando all'espressione.
-        """
-
         self.operands.append(operand)
 
-    def count_operands(self, count=0):
+    def count_operands(self):
+        count = 0
         for operand in self.operands:
-            if not isinstance(operand, AtomicElem):
-                count = operand.count_operands(count)
+            if not isinstance(operand, AtomicElement):
+                count += operand.count_operands()
             else:
                 count += 1
         return count
 
     def is_empty(self):
-
-        """
-        Controlla se l'espressione e' vuota, ovvero non contiene operandi.
-        """
-
         return len(self.operands) == 0
 
-    def get_prod_expression(self):
+    def get_product_expression(self):
         for operand in self.operands:
-            if isinstance(operand, ProdExpression):
+            if isinstance(operand, ProductExpression):
                 return operand
         return None
 
     def get_sum_expression(self):
         for operand in self.operands:
-            if isinstance(operand, SumExpression) and not operand.get_is_everywhere_id():
+            if isinstance(operand, SumExpression):
                 return operand
         return None
 
-    def get_incomplete_operand(self):
+    def get_pending_operand(self):
         if self.is_empty():
             return self
         if isinstance(self, SumExpression):
-            prod_expr = self.get_prod_expression()
+            prod_expr = self.get_product_expression()
             if prod_expr:
-                return prod_expr.get_incomplete_operand()
-            else:
-                return self
-        else:
-            sum_expr = self.get_sum_expression()
-            if sum_expr:
-                return sum_expr.get_incomplete_operand()
-            else:
-                return self
+                return prod_expr.get_pending_operand()
+            return self
+        sum_expr = self.get_sum_expression()
+        if sum_expr:
+            return sum_expr.get_pending_operand()
+        return self
 
-    def substitute(self, substitutions_map):
-        if not substitutions_map:
-            return
-        operands = []
+    def is_composed_by_all_atomic_elements(self):
         for operand in self.operands:
-            if isinstance(operand, AtomicElem):
-                new_operand = operand
-                if str(operand) in substitutions_map:
-                    new_operand = SumExpression([operand] + [AtomicElem(e) for e in substitutions_map[str(operand)]])
-            else:
-                operand.substitute(substitutions_map)
-                new_operand = operand
-            operands.append(new_operand)
-        self.operands = operands
+            if not isinstance(operand, AtomicElement):
+                return False
+        return True
 
-class ProdExpression(Expression):
-
-    """
-    Rappresenta un'espressione i cui operandi sono legati dall'operatore '*'.
-    Tale espressione e' adatta a rappresentare gli id degli elementi appartenenti a tutti i mhs del contesto attuale e
-    per unire l'espressione temporanea con il risultato della ricorsione.
-    """
-
-    def __init__(self, operands=None):
-        super(ProdExpression, self).__init__(operands)
-        # Expression.__init__(self, operands)
-
-    def __str__(self):
-
-        """
-        Crea e restituisce una rappresentazione dell'espressione in forma testuale.
-        """
-
-        # return '(' + '*'.join([str(op) for op in self.operands]) + ')'
-        result = []
-        for i, operand in enumerate(self.operands):
-            if isinstance(operand, SumExpression) and operand.count_operands() > 1:
-                result.append('(' + str(operand) + ')')
-            else:
-                result.append(str(operand))
-        return '*'.join(result)
-
-    def to_string(self, prefix):
-        result = []
-        for i, operand in enumerate(self.operands):
-            if isinstance(operand, SumExpression) and operand.count_operands() > 1:
-                result.append('(' + operand.to_string(prefix) + ')')
-            else:
-                result.append(operand.to_string(prefix))
-        return '*'.join(result)
+    def remove_pending_operand(self):
+        if isinstance(self, ProductExpression):
+            if self.is_composed_by_all_atomic_elements():
+                self.operands = []
+                return
+        for operand in self.operands:
+            if isinstance(operand, SumExpression):
+                operand.remove_pending_operand()
+            elif isinstance(operand, ProductExpression):
+                if operand.is_composed_by_all_atomic_elements():
+                    self.operands.remove(operand)
+                    return
+                operand.remove_pending_operand()
 
 class SumExpression(Expression):
 
     """
     Rappresenta un'espressione i cui operandi sono legati dall'operatore '+'.
-    Tale espressione e' adatta a rappresentare i singoletti, le sostituzioni in caso di colonne duplicate e per unire i
-    risultati trovati con l'eliminazione di una colonna per volta.
+    Tale espressione e' adatta a rappresentare i singoletti e per unire i risultati trovati con il metodo per colonne
     """
 
     def __init__(self, operands=None):
         super(SumExpression, self).__init__(operands)
-        self.is_everywhere_id = False
-        # Expression.__init__(self, operands)
+        self.operator = '+'
 
     def __str__(self):
+        return self.operator.join([str(operand) for operand in self.operands])
 
-        """
-        Crea e restituisce una rappresentazione dell'espressione in forma testuale.
-        """
-
-        # return '(' + '+'.join([str(op) for op in self.operands]) + ')'
-        return '+'.join([str(op) for op in self.operands])
-
-    def to_string(self, prefix):
-        return '+'.join([op.to_string(prefix) for op in self.operands])
-
-    def get_is_everywhere_id(self):
-        return self.is_everywhere_id
-
-    def set_is_everywhere_id(self, flag=True):
-        self.is_everywhere_id = flag
-
-class AtomicElem:
+class ProductExpression(Expression):
 
     """
-    Rappresenta un elemento atomico dell'espressione, quindi l'id di un singoletto o di un elemento che appartiene a
-    a tutti i mhs del contesto corrente.
+    Rappresenta un'espressione i cui operandi sono legati dall'operatore '*'.
+    Tale espressione e' adatta a rappresentare gli id degli elementi appartenenti a tutti i mhs del contesto attuale e
+    per unire l'id della colonna scelta dal metodo per colonne con il relativo risultato
     """
 
-    def __init__(self, operand):
-
-        """
-        Inizializza l'elemento atomico attribuendo il corrispondente id.
-        """
-
-        self.operand = operand
+    def __init__(self, operands=None):
+        super(ProductExpression, self).__init__(operands)
+        self.operator = '*'
 
     def __str__(self):
-
-        """
-        Restituisce l'id dell'elemento atomico.
-        """
-
-        return self.operand
-
-    def to_string(self, prefix):
-        return prefix + str(self)
+        operands = []
+        for i, operand in enumerate(self.operands):
+            if isinstance(operand, SumExpression) and operand.count_operands() > 1:
+                operands.append('(' + str(operand) + ')')
+            else:
+                operands.append(str(operand))
+        return self.operator.join(operands)
