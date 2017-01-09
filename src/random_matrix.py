@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 
+from file import *
 from utils import *
 
 MATRIX_DIR = 'matrix/'
