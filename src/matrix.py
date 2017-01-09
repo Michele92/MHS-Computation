@@ -174,6 +174,9 @@ class Matrix:
             s += ' '.join(['%5s' % bit for bit in str(row)]) + '\n'
         return s
 
+    def get_cols(self):
+        return self.cols
+
     def get_col_by_id(self, col_id):
         for col in self.cols:
             if col.get_id() == col_id:

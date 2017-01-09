@@ -76,8 +76,8 @@ def compute_mhs(matrix, original_matrix=None, removed_cols=None, removed_rows=No
     sum_expr = SumExpression()
     complementary_cols = OrderedDict()
     while not matrix.is_empty() and not matrix.check_for_rows_without_1():
-        # col_id = matrix.get_cols()[0].get_id()
-        col_id = matrix.find_next_col(complementary_cols)
+        col_id = matrix.get_cols()[0].get_id()
+        # col_id = matrix.find_next_col(complementary_cols)
         _original_matrix = deepcopy(original_matrix)
         if _original_matrix.check_for_hit_grey_rows(col_id):
             matrix.submatrix(removed_cols=[col_id])
