@@ -90,6 +90,21 @@ class Expression(object):
                     return
                 operand.remove_pending_operand()
 
+    def substitute(self, substitutions_map):
+        if not substitutions_map:
+            return
+        operands = []
+        for operand in self.operands:
+            if isinstance(operand, AtomicElement):
+                new_operand = operand
+                if str(operand) in substitutions_map:
+                    new_operand = SumExpression([operand] + [AtomicElement(e) for e in substitutions_map[str(operand)]])
+            else:
+                operand.substitute(substitutions_map)
+                new_operand = operand
+            operands.append(new_operand)
+        self.operands = operands
+
 class SumExpression(Expression):
 
     """

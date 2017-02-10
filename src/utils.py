@@ -60,41 +60,69 @@ def generate_expression(singletons, everywhere_ids, matrix, original_matrix):
             expr = prod_expr
     return expr, stop
 
-def compute_mhs(matrix, original_matrix=None, removed_cols=None, removed_rows=None):
+def compute_mhs(matrix):
+    expr, substitutions_map = recursive_compute_mhs(matrix)
+    expr.substitute(substitutions_map)
+    return expr
+
+def recursive_compute_mhs(matrix, original_matrix=None, removed_cols=None, removed_rows=None, enable_map=False, enable_partition=True):
     if not original_matrix:
         original_matrix = deepcopy(matrix)
     if removed_cols:
+        col_id = matrix.get_cols()[removed_cols[0]].get_id()
         matrix.submatrix(removed_rows=removed_rows)
         matrix.submatrix(removed_cols=removed_cols)
-        original_matrix.set_grey_rows(removed_cols[0])
-    singletons, everywhere_ids = matrix.preprocessing()
+        original_matrix.set_grey_rows(col_id)
+    singletons, everywhere_ids, substitutions_map = matrix.preprocessing(enable_map)
     expr, stop = generate_expression(singletons, everywhere_ids, matrix, original_matrix)
     if matrix.is_empty() or stop:
         if expr and stop:
             expr.remove_pending_operand()
-        return expr
+        return expr, substitutions_map
+    submatrices = [matrix]
+    partitionable = False
+    if enable_partition:
+        submatrices = matrix.partition()
+        if submatrices:
+            partitionable = True
+            substitutions_map = {}
+        else:
+            substitutions_map = matrix.remove_duplicated_cols()
+            submatrices = [matrix]
+    prod_expr = ProductExpression()
     sum_expr = SumExpression()
     complementary_cols = OrderedDict()
-    while not matrix.is_empty() and not matrix.check_for_rows_without_1():
-        col_id = matrix.get_cols()[0].get_id()
-        # col_id = matrix.find_next_col(complementary_cols)
-        _original_matrix = deepcopy(original_matrix)
-        if _original_matrix.check_for_hit_grey_rows(col_id):
-            matrix.submatrix(removed_cols=[col_id])
-            continue
-        hit_rows = matrix.hit_rows(col_id)
-        super_cols = matrix.get_super_cols(col_id)
-        result = compute_mhs(deepcopy(matrix), _original_matrix, [col_id] + super_cols, hit_rows)
-        matrix.submatrix(removed_cols=[col_id])
-        if result and not result.is_empty():
-            sum_expr.add_operand(ProductExpression([AtomicElement(col_id), result]))
+    for submatrix in submatrices:
+        if partitionable:
+            result, tmp_map = recursive_compute_mhs(matrix=deepcopy(submatrix), enable_map=True, enable_partition=False)
+            substitutions_map.update(tmp_map)
+            if result and not result.is_empty():
+                prod_expr.add_operand(result)
+        else:
+            while not submatrix.is_empty() and not submatrix.check_for_rows_without_1():
+                col_index = 0
+                # col_index = len(matrix.get_cols()) - 1
+                # col_index = submatrix.find_next_col(complementary_cols)
+                # col_index = submatrix.find_next_col()
+                col_id = submatrix.get_cols()[col_index].get_id()
+                _original_matrix = deepcopy(original_matrix)
+                if _original_matrix.check_for_hit_grey_rows(col_id):
+                    submatrix.submatrix(removed_cols=[col_index])
+                    continue
+                hit_rows = submatrix.hit_rows(col_index)
+                super_cols = submatrix.get_super_cols(col_index)
+                result, _ = recursive_compute_mhs(matrix=deepcopy(submatrix), original_matrix=_original_matrix, removed_cols=[col_index] + super_cols, removed_rows=hit_rows, enable_partition=False)
+                submatrix.submatrix(removed_cols=[col_index])
+                if result and not result.is_empty():
+                    sum_expr.add_operand(ProductExpression([AtomicElement(col_id), result]))
+    result = sum_expr
+    if enable_partition and partitionable:
+        result = prod_expr
     if not expr or expr.is_empty():
-        return sum_expr
-    if not sum_expr.is_empty():
+        return result, substitutions_map
+    if not result.is_empty():
         pending_operand = expr.get_pending_operand()
-        pending_operand.add_operand(sum_expr)
+        pending_operand.add_operand(result)
     else:
         expr.remove_pending_operand()
-    return expr
-
-
+    return expr, substitutions_map
