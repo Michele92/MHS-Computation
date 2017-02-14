@@ -6,20 +6,6 @@ from bitarray import *
 from orderedset import OrderedSet
 from copy import deepcopy
 
-class CustomSet(OrderedSet):
-
-    """Classe wrapper utile per il debug"""
-
-    def __repr__(self):
-        return '{' + ', '.join([repr(self.__getitem__(i)) for i in range(len(self))]) + '}'
-
-class CustomList(list):
-
-    """Classe wrapper utile per il debug"""
-
-    def __repr__(self):
-        return '[' + ', '.join([repr(self.__getitem__(i)) for i in range(len(self))]) + ']'
-
 class Bitset(bitarray):
 
     """Classe wrapper che rappresenta un vettore di valori binari"""
@@ -158,8 +144,8 @@ class Matrix:
     """
 
     def __init__(self, rows=None, col_ids=None):
-        self.rows = CustomSet()
-        self.cols = CustomList()
+        self.rows = OrderedSet()
+        self.cols = []
         self.counter1_col = []
         if rows:
             for row in rows:
@@ -204,9 +190,9 @@ class Matrix:
 
     def update_rows(self):
         if not self.cols:
-            self.rows = CustomSet()
+            self.rows = OrderedSet()
             return
-        rows = CustomSet()
+        rows = OrderedSet()
         for i in range(len(self.rows)):
             bitset = Bitset()
             for col in self.cols:
@@ -216,9 +202,9 @@ class Matrix:
 
     def update_cols(self):
         if not self.rows:
-            self.cols = CustomList()
+            self.cols = []
             return
-        cols = CustomList()
+        cols = []
         for i in range(len(self.cols)):
             col_id = self.cols[i].get_id()
             bitset = Bitset()
@@ -234,8 +220,8 @@ class Matrix:
             self.counter1_col.append(int(col.count()))
 
     def submatrix(self, removed_rows=None, removed_cols=None):
-        rows = CustomSet()
-        cols = CustomList()
+        rows = OrderedSet()
+        cols = []
         if removed_rows:
             for i, row in enumerate(self.rows):
                 if i not in removed_rows:

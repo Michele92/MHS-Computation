@@ -100,9 +100,9 @@ def recursive_compute_mhs(matrix, original_matrix=None, removed_cols=None, remov
                 prod_expr.add_operand(result)
         else:
             while not submatrix.is_empty() and not submatrix.check_for_rows_without_1():
-                col_index = 0
+                # col_index = 0
                 # col_index = len(matrix.get_cols()) - 1
-                # col_index = submatrix.find_next_col(complementary_cols)
+                col_index = submatrix.find_next_col(complementary_cols)
                 # col_index = submatrix.find_next_col()
                 col_id = submatrix.get_cols()[col_index].get_id()
                 _original_matrix = deepcopy(original_matrix)
