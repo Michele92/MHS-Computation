@@ -17,4 +17,5 @@ def read_matrix(path):
             if not line.startswith(';'):
                 rows.append(line[:-2].replace(' ', ''))
     f.close()
-    return Matrix(rows)
+    size = (len(rows), len(rows[0]))
+    return Matrix(rows), size

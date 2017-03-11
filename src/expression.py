@@ -1,27 +1,8 @@
 """Contiene le classi per rappresentare l'espressione dei minimal hitting set"""
 
-class AtomicElement:
-
-    """
-    Rappresenta un elemento atomico dell'espressione, dunque l'id di una colonna
-    """
-
-    def __init__(self, operand):
-        self.operand = operand
-
-    def __str__(self):
-        return str(self.operand)
-
 class Expression(object):
 
-    """
-    Rappresenta un'espressione generica.
-    Puo' specializzarsi nelle classi SumExpression e ProductExpression a seconda dell'operatore coinvolto.
-    Gli operandi possono essere a loro volta espressioni (istanze di Expression) o elementi atomici (istanze di
-    AtomicElement)
-    """
-
-    def __init__(self, operands):
+    def __init__(self, operands=None):
         if not operands:
             self.operands = []
         else:
@@ -105,12 +86,19 @@ class Expression(object):
             operands.append(new_operand)
         self.operands = operands
 
-class SumExpression(Expression):
+class AtomicElement(Expression):
 
-    """
-    Rappresenta un'espressione i cui operandi sono legati dall'operatore '+'.
-    Tale espressione e' adatta a rappresentare i singoletti e per unire i risultati trovati con il metodo per colonne
-    """
+    def __init__(self, operand):
+        super(AtomicElement, self).__init__()
+        self.operand = operand
+
+    def __str__(self):
+        return str(self.operand)
+
+    def count_solutions(self):
+        return 1
+
+class SumExpression(Expression):
 
     def __init__(self, operands=None):
         super(SumExpression, self).__init__(operands)
@@ -119,13 +107,13 @@ class SumExpression(Expression):
     def __str__(self):
         return self.operator.join([str(operand) for operand in self.operands])
 
-class ProductExpression(Expression):
+    def count_solutions(self):
+        result = 0
+        for operand in self.operands:
+            result += operand.count_solutions()
+        return result
 
-    """
-    Rappresenta un'espressione i cui operandi sono legati dall'operatore '*'.
-    Tale espressione e' adatta a rappresentare gli id degli elementi appartenenti a tutti i mhs del contesto attuale e
-    per unire l'id della colonna scelta dal metodo per colonne con il relativo risultato
-    """
+class ProductExpression(Expression):
 
     def __init__(self, operands=None):
         super(ProductExpression, self).__init__(operands)
@@ -139,3 +127,9 @@ class ProductExpression(Expression):
             else:
                 operands.append(str(operand))
         return self.operator.join(operands)
+
+    def count_solutions(self):
+        result = 1
+        for operand in self.operands:
+            result *= operand.count_solutions()
+        return result
